@@ -37,7 +37,7 @@ end;
 
 procedure TApiTest.Auth;
 begin
-  CheckTrue(FApi.Auth('krka-92', 'Qq1234'));
+  CheckTrue(FApi.Auth('krka-92', '****'));
 end;
 
 procedure TApiTest.TestDownload;
