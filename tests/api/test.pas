@@ -21,6 +21,21 @@ type
 
 implementation
 
+function GetAccountInfo(var login, pass: String): Boolean;
+var
+  FN: String;
+  F: TextFile;
+begin
+  FN := ExtractFilePath(ParamStr(0)) + 'ym_account.env';
+  Assign(F, FN);
+  try
+    Reset(F);
+    ReadLn(F, login);
+    ReadLn(F, pass);
+  finally Close(F);
+  end;
+end;
+
 procedure TApiTest.SetUp;
 begin
   inherited;
@@ -35,8 +50,11 @@ begin
 end;
 
 procedure TApiTest.Auth;
+var
+  l, p: String;
 begin
-  CheckTrue(FApi.Auth('krka-92', 'Qq1234'));
+  GetAccountInfo(l, p);
+  CheckTrue(FApi.Auth(l, p));
 end;
 
 procedure TApiTest.TestDownload;
