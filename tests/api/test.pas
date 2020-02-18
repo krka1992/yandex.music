@@ -15,7 +15,6 @@ type
     procedure Auth;
     procedure TestDownload;
     procedure TestGetMp3;
-
   published
     procedure TestGetPlaylist;
   end;
