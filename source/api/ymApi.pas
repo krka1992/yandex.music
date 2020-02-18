@@ -2,7 +2,7 @@ unit ymApi;
 
 interface
 
-uses SysUtils, idHTTP, System.classes, System.JSON, oxmlcdom, sblmd5, sblBuffer;
+uses SysUtils, idHTTP, System.classes, System.JSON, oxmlcdom, sblmd5, sblBuffer, ymFace;
 
 type
 
@@ -44,7 +44,7 @@ type
     function Fill(Value: TJSONObject): Boolean;
   end;
 
-  TymTrack = class(TObject)
+  TymTrack = class(TymObject)
   private
     FOwner: TymApi;
     FData: TMemoryStream;
@@ -68,7 +68,7 @@ type
     Name: String;
   end;
 
-  TymPlaylist = class(TObject)
+  TymPlaylist = class(TymObject)
   private
     FOwner: TymApi;
     FPlaylistId: String;
@@ -81,7 +81,7 @@ type
     function GetCount: Integer;
   end;
 
-  TymApi = class(TObject)
+  TymApi = class(TymObject)
   private
     FHTTP: TidHTTP;
     FAccessToken: TymToken;

@@ -15,8 +15,8 @@ type
     procedure Auth;
     procedure TestDownload;
     procedure TestGetMp3;
-
   published
+
     procedure TestGetPlaylist;
   end;
 
@@ -32,12 +32,12 @@ end;
 procedure TApiTest.TearDown;
 begin
   inherited;
-  FApi._Release;
+  FApi.Free;
 end;
 
 procedure TApiTest.Auth;
 begin
-  CheckTrue(FApi.Auth('krka-92', 'Qq1234'));
+  CheckTrue(FApi.Auth('krka-92', '****'));
 end;
 
 procedure TApiTest.TestDownload;
@@ -78,10 +78,9 @@ begin
     Track.Load;
     WriteLn(' --> Success');
     Track.Save(Format('%s.mp3', [Track.Name]));
-    Track._Release;
-    if i > 0 then break;
+    Track.Free;
   end;
-  Playlist._Release;
+  Playlist.Free;
 end;
 
 begin

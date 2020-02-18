@@ -151,8 +151,6 @@
         </DelphiCompile>
         <DCCReference Include="test.pas"/>
         <DCCReference Include="..\..\source\api\ymApi.pas"/>
-        <DCCReference Include="..\..\source\api\ymFace.pas"/>
-        <DCCReference Include="test.obj.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
