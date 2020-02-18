@@ -2,8 +2,13 @@ program api.yandex.test;
 
 {$APPTYPE CONSOLE}
 {$R *.res}
+{.$DEFINE CHECK_LEACKS}
 
-uses DUnitTestRunner,
+uses
+  {$IFDEF CHECK_LEACKS}
+  {}fastmm4,
+  {$ENDIF}
+  DUnitTestRunner,
   System.SysUtils,
   test in 'test.pas',
   ymApi in '..\..\source\api\ymApi.pas',

@@ -188,7 +188,9 @@ begin
 
     FAuthorized := true;
     Result := true;
-  finally param.Free;
+  finally
+    param.Free;
+    JSON.Free;
   end;
 
 end;
