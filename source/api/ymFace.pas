@@ -2,7 +2,7 @@ unit ymFace;
 
 interface
 
-uses Sysutils, sblRefObject;
+uses Sysutils;
 
 type
   TymObject = class(TObject)

@@ -2,7 +2,7 @@ unit ymApi;
 
 interface
 
-uses SysUtils, idHTTP, System.classes, System.JSON, oxmlcdom, sblmd5, sblBuffer, ymFace;
+uses SysUtils, idHTTP, System.classes, System.JSON, oxmlcdom, ymFace;
 
 type
 
@@ -228,6 +228,7 @@ var
   end;
 
 begin
+  {TODO: Убрать отсюда OXML. Мне нужно несколько параметров из тела. Можно самому распарсить}
   FileDownloadInfoXML := GET(Uri);
 
   xml := TXMLDocument.Create;
@@ -241,7 +242,9 @@ begin
     S := GetChildNodeText(Node, 's');
 
     sign := Format('XGRlBW9FXlekgbPrRHuSiA%s%s', [Copy(Path, 2, Length(Path) - 1), S]);
-    signHashed := MD5DigestToStrA(MD5String(sign));
+    //signHashed := MD5DigestToStrA(MD5String(sign));
+    signHashed := '202cb962ac59075b964b07152d234b70';
+    {TODO: Надо разобраться для чего эта строка ^}
 
     Result := Format('https://%s/get-%s/%s/%s%s', [Host, 'mp3', signHashed, TS, Path]);
   finally xml.Free;
