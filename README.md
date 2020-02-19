@@ -1,2 +1,2 @@
 # yandex.music
-API from yandex music
+API for yandex music
