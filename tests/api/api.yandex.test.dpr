@@ -6,14 +6,16 @@ program api.yandex.test;
 
 uses
   {$IFDEF CHECK_LEACKS}
-  {}fastmm4,
-  {$ENDIF}
+  fastmm4,
+  {$ENDIF }
   DUnitTestRunner,
   System.SysUtils,
   test in 'test.pas',
   ymApi in '..\..\source\api\ymApi.pas',
   ymFace in '..\..\source\api\ymFace.pas',
-  test.obj in 'test.obj.pas';
+  test.obj in 'test.obj.pas',
+  ymPlaylist in '..\..\source\api\ymPlaylist.pas',
+  ymTrack in '..\..\source\api\ymTrack.pas';
 
 begin
   ReportMemoryLeaksOnShutdown := true;

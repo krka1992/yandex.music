@@ -60,7 +60,7 @@ type
     procedure Save(const Filename: String);
     property Data: TMemoryStream read FData;
     property Info: TymDownloadInfo read FInfo;
-    property Name: String read FName;
+    property Name: String read FName write FName;
   end;
 
   TTrackId = record
@@ -68,96 +68,57 @@ type
     Name: String;
   end;
 
-  TymPlaylist = class(TymObject)
-  private
-    FOwner: TymApi;
-    FPlaylistId: String;
-    FTrackIds: array of TTrackId;
-    procedure Load;
-  public
-    constructor Create(Owner: TymApi; const PlaylistId: String);
-    destructor Destroy; override;
-    function CreateTrack(index: Integer): TymTrack;
-    function GetCount: Integer;
-  end;
-
   TymApi = class(TymObject)
   private
-    FHTTP: TidHTTP;
     FAccessToken: TymToken;
     FAuthorized: Boolean;
     function POST(const Uri: String; Params: TStringList): String;
     function GET(const Uri: String): String;
-    function SendMethod(const Uri: String): TJSONObject;
+
+    function GetAuthParams(const Username, Password: String): TStringList;
     function InternalAuth(const Username, Password: String): Boolean;
   protected
     procedure _DownloadInfo(const TrackId: String; DownloadInfo: PymDownloadInfo);
     function _FileDownloadInfo(const Uri: String): string;
     function GetDirectUrlMp3(const Uri: String): String;
     function _GetMp3(const DirectUrl: String): TMemoryStream;
-    function _GetUserPlaylist(const PlaylistId: String): TJSONObject;
   public
     constructor Create;
     destructor Destroy; override;
+    function SendMethod(const Uri: String): TJSONObject;
+    function CreateConnection: TymConnection;
+    function CheckTokenExpires: Boolean;
     function Auth(const Username, Password: String): Boolean;
     function GetTrack(const TrackId: String): TymTrack;
-    function GetUserPlaylist(const PlaylistId: String): TymPlaylist;
+    function GetUserPlaylist(const PlaylistId: String): Pointer;
   end;
 
 implementation
 
-function _JSONString(Node: TJSONObject; const Name: String): String;
-var
-  ErrMsg: String;
-begin
-  if not Assigned(Node) then raise Exception.Create('Error Message');
-  if Node.Values[Name].TryGetValue(Result) then exit;
-  ErrMsg := Format('Не удалось получить строковое значение пары с ключом: "%s"', [Name]);
-  raise Exception.Create(ErrMsg);
-end;
+uses ymPlaylist;
 
-function _JSONBool(Node: TJSONObject; const Name: String): Boolean;
-var
-  ErrMsg: String;
-begin
-  if not Assigned(Node) then raise Exception.Create('Error Message');
-  if Node.Values[Name].TryGetValue(Result) then exit;
-  ErrMsg := Format('Не удалось получить булево значение пары с ключом: "%s"', [Name]);
-  raise Exception.Create(ErrMsg);
-end;
-
-function _JSONInt32(Node: TJSONObject; const Name: String): Integer;
-var
-  ErrMsg: String;
-begin
-  if not Assigned(Node) then raise Exception.Create('Error Message');
-  if Node.Values[Name].TryGetValue(Result) then exit;
-  ErrMsg := Format('Не удалось получить числовое значение пары с ключом: "%s"', [Name]);
-  raise Exception.Create(ErrMsg);
-end;
+const
+  _CLIENT_ID = '23cabbbdc6cd418abb4b39c32c41195d';
+  _CLIENT_SECRET = '53bc75238f0c4d08a118e51fe9203300';
 
 constructor TymApi.Create;
 begin
   inherited Create;
-  FHTTP := TidHTTP.Create();
-  FHTTP.HTTPOptions := FHTTP.HTTPOptions + [hoKeepOrigProtocol];
-  FHTTP.Request.Accept := 'application/json';
-  FHTTP.Request.Connection := 'Keep-Alive';
-  FHTTP.Request.AcceptLanguage := 'ru';
-  FHTTP.Request.CacheControl := 'no-cache';
-  //FHTTP.Request.AcceptEncoding := 'gzip, deflate';
-  FHTTP.Request.UserAgent := 'Windows 10';
 end;
 
 destructor TymApi.Destroy;
 begin
-  FreeAndNil(FHTTP);
   inherited Destroy;
 end;
 
 function TymApi.GET(const Uri: String): String;
 begin
-  Result := FHTTP.GET(Uri);
+  with CreateConnection do
+  begin
+    try Result := HTTP.GET(Uri);
+    finally _Release;
+    end;
+  end;
 end;
 
 function TymApi.InternalAuth(const Username, Password: String): Boolean;
@@ -168,15 +129,13 @@ var
 begin
   if FAuthorized then exit(true);
   Result := false;
-  param := TStringList.Create;
-  try
-    param.Add('grant_type=password');
-    param.Add('client_id=23cabbbdc6cd418abb4b39c32c41195d');
-    param.Add('client_secret=53bc75238f0c4d08a118e51fe9203300');
-    param.Add(Format('username=%s', [Username]));
-    param.Add(Format('password=%s', [Password]));
 
+  JSON := nil;
+  param := GetAuthParams(Username, Password);
+  try
     Res := POST('https://oauth.yandex.ru/token', param);
+    if Res = '' then raise Exception.Create('Error authentification');
+
     JSON := TJSONObject.ParseJSONValue(Res, false, true) as TJSONObject;
 
     FAccessToken.TokenType := JSON.Values['token_type'].Value;
@@ -184,21 +143,25 @@ begin
     FAccessToken.Expires := JSON.Values['expires_in'].Value;
     FAccessToken.Uid := JSON.Values['uid'].Value;
 
-    FHTTP.Request.CustomHeaders.AddValue('Authorization', Format('OAuth %s', [FAccessToken.AccesToken]));
-
     FAuthorized := true;
     Result := true;
   finally
     param.Free;
-    JSON.Free;
+    if Assigned(JSON) then JSON.Free;
   end;
 
 end;
 
 function TymApi.POST(const Uri: String; Params: TStringList): String;
 begin
-  FHTTP.Request.ContentType := 'application/x-www-form-urlencoded';
-  Result := FHTTP.POST(Uri, Params);
+  with CreateConnection do
+  begin
+    try
+      HTTP.Request.ContentType := 'application/x-www-form-urlencoded';
+      Result := HTTP.POST(Uri, Params);
+    finally _Release;
+    end;
+  end;
 end;
 
 function TymApi.Auth(const Username, Password: String): Boolean;
@@ -210,6 +173,30 @@ begin
       Result := false;
     end;
   end;
+end;
+
+function TymApi.CheckTokenExpires: Boolean;
+begin
+  _RAISE_STUB('Сделать проверку истечения времени действия токена');
+  {TODO: Сделать проверку истечения времени действия токена}
+end;
+
+function TymApi.CreateConnection: TymConnection;
+begin
+  Result := TymConnection.Create;
+  if FAuthorized then
+    {}with Result.HTTP.Request.CustomHeaders do
+      {}AddValue('Authorization', Format('OAuth %s', [FAccessToken.AccesToken]));
+end;
+
+function TymApi.GetAuthParams(const Username, Password: String): TStringList;
+begin
+  Result := TStringList.Create;
+  Result.Add('grant_type=password');
+  Result.Add(Format('client_id=%s', [_CLIENT_ID]));
+  Result.Add(Format('client_secret=%s', [_CLIENT_SECRET]));
+  Result.Add(Format('username=%s', [Username]));
+  Result.Add(Format('password=%s', [Password]));
 end;
 
 function TymApi.GetDirectUrlMp3(const Uri: String): String;
@@ -251,7 +238,7 @@ begin
   end;
 end;
 
-function TymApi.GetUserPlaylist(const PlaylistId: String): TymPlaylist;
+function TymApi.GetUserPlaylist(const PlaylistId: String): Pointer;
 begin
   Result := TymPlaylist.Create(self, PlaylistId);
 end;
@@ -286,15 +273,12 @@ end;
 function TymApi._GetMp3(const DirectUrl: String): TMemoryStream;
 begin
   Result := TMemoryStream.Create;
-  FHTTP.GET(DirectUrl, Result);
-end;
-
-function TymApi._GetUserPlaylist(const PlaylistId: String): TJSONObject;
-var
-  Uri: String;
-begin
-  Uri := Format('https://api.music.yandex.net/users/692529388/playlists/%s', [PlaylistId]);
-  Result := SendMethod(Uri);
+  with CreateConnection do
+  begin
+    try HTTP.GET(DirectUrl, Result);
+    finally _Release;
+    end;
+  end;
 end;
 
 function TymDownloadInfo.Add: PymDownloadInfoItem;
@@ -409,53 +393,6 @@ procedure TymTrack.Save(const Filename: String);
 begin
   if not Assigned(FData) then exit;
   FData.SaveToFile(Filename);
-end;
-
-constructor TymPlaylist.Create(Owner: TymApi; const PlaylistId: String);
-begin
-  inherited Create;
-  FOwner := Owner;
-  FPlaylistId := PlaylistId;
-  Load;
-end;
-
-destructor TymPlaylist.Destroy;
-begin
-  inherited Destroy;
-end;
-
-function TymPlaylist.CreateTrack(index: Integer): TymTrack;
-begin
-  if (Index < 0) or (Index >= GetCount) then exit(nil);
-  Result := TymTrack.Create(FOwner, FTrackIds[Index].Id);
-  Result.FName := FTrackIds[Index].Name;
-end;
-
-function TymPlaylist.GetCount: Integer;
-begin
-  Result := Length(FTrackIds);
-end;
-
-procedure TymPlaylist.Load;
-var
-  JSON, Track, Item: TJSONObject;
-  Tracks: TJSONArray;
-  i: Integer;
-begin
-  JSON := FOwner._GetUserPlaylist(FPlaylistId);
-  try
-    with JSON.GetValue('result') as TJSONObject do
-      {}Tracks := GetValue('tracks') as TJSONArray;
-    SetLength(FTrackIds, Tracks.Count);
-    for i := 0 to Tracks.Count - 1 do
-    begin
-      Item := Tracks.Items[i] as TJSONObject;
-      FTrackIds[i].Id := _JSONString(Item, 'id');
-      Track := Item.GetValue('track') as TJSONObject;
-      FTrackIds[i].Name := _JSONString(Track, 'title');
-    end;
-  finally JSON.Free;
-  end;
 end;
 
 end.
