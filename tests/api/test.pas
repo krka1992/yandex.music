@@ -2,7 +2,7 @@ unit test;
 
 interface
 
-uses sysutils, TestFramework, ymApi, ymPlaylist,
+uses sysutils, TestFramework, ymApi, ymPlaylist, ymTrack,
   JSON;
 
 type

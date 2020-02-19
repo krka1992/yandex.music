@@ -15,7 +15,9 @@ uses
   ymFace in '..\..\source\api\ymFace.pas',
   test.obj in 'test.obj.pas',
   ymPlaylist in '..\..\source\api\ymPlaylist.pas',
-  ymTrack in '..\..\source\api\ymTrack.pas';
+  ymTrack in '..\..\source\api\ymTrack.pas',
+  ymUser in '..\..\source\api\ymUser.pas',
+  ymFeed in '..\..\source\api\ymFeed.pas';
 
 begin
   ReportMemoryLeaksOnShutdown := true;

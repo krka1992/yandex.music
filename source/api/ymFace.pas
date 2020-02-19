@@ -2,7 +2,7 @@ unit ymFace;
 
 interface
 
-uses Sysutils, idHTTP, System.JSON;
+uses Sysutils, idHTTP, System.JSON, System.Classes;
 
 type
   TymObject = class(TObject)
@@ -27,6 +27,24 @@ type
     constructor Create;
     destructor Destroy; override;
     property HTTP: TidHTTP read FHTTP;
+  end;
+
+  TymToken = record
+    TokenType: String;
+    AccesToken: String;
+    Expires: String;
+    Uid: String;
+  end;
+
+  TymObjectApi = class(TymObject)
+  protected
+    FAccessToken: TymToken;
+    FAuthorized: Boolean;
+  public
+    function GET(const Uri: String): String;
+    function POST(const Uri: String; Params: TStringList): String;
+    function CreateConnection: TymConnection;
+    function SendMethod(const Uri: String): TJSONObject;
   end;
 
 procedure _ReleaseNil(var Obj: TymObject);
@@ -157,6 +175,41 @@ destructor TymConnection.Destroy;
 begin
   FreeAndNil(FHTTP);
   inherited Destroy;
+end;
+
+function TymObjectApi.CreateConnection: TymConnection;
+begin
+  Result := TymConnection.Create;
+  if FAuthorized then
+    {}with Result.HTTP.Request.CustomHeaders do
+      {}AddValue('Authorization', Format('OAuth %s', [FAccessToken.AccesToken]));
+end;
+
+function TymObjectApi.GET(const Uri: String): String;
+begin
+  with CreateConnection do
+  begin
+    try Result := HTTP.GET(Uri);
+    finally _Release;
+    end;
+  end;
+end;
+
+function TymObjectApi.POST(const Uri: String; Params: TStringList): String;
+begin
+  with CreateConnection do
+  begin
+    try
+      HTTP.Request.ContentType := 'application/x-www-form-urlencoded';
+      Result := HTTP.POST(Uri, Params);
+    finally _Release;
+    end;
+  end;
+end;
+
+function TymObjectApi.SendMethod(const Uri: String): TJSONObject;
+begin
+  Result := TJSONObject.ParseJSONValue(GET(Uri)) as TJSONObject;
 end;
 
 end.

@@ -2,19 +2,24 @@ unit ymPlaylist;
 
 interface
 
-uses ymApi, ymFace, System.JSON, SysUtils;
+uses ymFace, ymTrack, System.JSON, SysUtils;
 
 type
+  TTrackId = record
+    Id: String;
+    Name: String;
+  end;
+
   TymPlaylist = class(TymObject)
   private
-    FOwner: TymApi;
+    FOwner: TymObjectApi;
     FPlaylistId: String;
     FTrackIds: array of TTrackId;
     procedure Load;
   protected
     function _GetUserPlaylist(const PlaylistId: String): TJSONObject;
   public
-    constructor Create(Owner: TymApi; const PlaylistId: String);
+    constructor Create(Owner: TymObjectApi; const PlaylistId: String);
     destructor Destroy; override;
     function CreateTrack(index: Integer): TymTrack;
     function GetCount: Integer;
@@ -22,7 +27,7 @@ type
 
 implementation
 
-constructor TymPlaylist.Create(Owner: TymApi; const PlaylistId: String);
+constructor TymPlaylist.Create(Owner: TymObjectApi; const PlaylistId: String);
 begin
   inherited Create;
   FOwner := Owner;

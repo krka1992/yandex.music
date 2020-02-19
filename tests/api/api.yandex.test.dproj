@@ -155,6 +155,8 @@
         <DCCReference Include="test.obj.pas"/>
         <DCCReference Include="..\..\source\api\ymPlaylist.pas"/>
         <DCCReference Include="..\..\source\api\ymTrack.pas"/>
+        <DCCReference Include="..\..\source\api\ymUser.pas"/>
+        <DCCReference Include="..\..\source\api\ymFeed.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
