@@ -3,7 +3,7 @@ unit ymApi;
 interface
 
 uses SysUtils, idHTTP, System.classes, System.JSON, oxmlcdom,
-  {}ymFace, ymPlaylist, ymTrack, ymUser;
+  {}ymFace, ymPlaylist, ymTrack, ymUser, ymFeed;
 
 type
   TymApi = class(TymObjectApi)
@@ -19,6 +19,7 @@ type
     function GetTrack(const TrackId: String): TymTrack;
     function GetUserPlaylist(const PlaylistId: String): TymPlaylist;
     function GetUser: TymUser;
+    function GetFeed: TymFeed;
   end;
 
 implementation
@@ -93,6 +94,11 @@ begin
   Result.Add(Format('client_secret=%s', [_CLIENT_SECRET]));
   Result.Add(Format('username=%s', [Username]));
   Result.Add(Format('password=%s', [Password]));
+end;
+
+function TymApi.GetFeed: TymFeed;
+begin
+  Result := TymFeed.Create(self);
 end;
 
 function TymApi.GetUserPlaylist(const PlaylistId: String): TymPlaylist;

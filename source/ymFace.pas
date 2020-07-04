@@ -2,7 +2,7 @@ unit ymFace;
 
 interface
 
-uses Sysutils, idHTTP, System.JSON, System.Classes;
+uses Sysutils, idHTTP, System.JSON, System.Classes, Windows, sblRefObject;
 
 type
   TymObject = class(TObject)
@@ -10,14 +10,49 @@ type
     FRefCount: Integer;
     FTerminated: nativeInt;
     function GetTerminated: Boolean;
+  protected
+    procedure DoTerminate; virtual;
   public
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
     procedure Terminate;
-    function _CopyRef: TymObject;
+    function _CopyRef: Pointer;
     procedure _Release;
     property RefCount: Integer read FRefCount;
     property Terminated: Boolean read GetTerminated;
+  end;
+
+  TymObjectLocked = class(TymObject)
+  private
+    FRTLCS: TRTLCriticalSection;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Lock;
+    procedure Unlock;
+  end;
+
+  TymObjectList = class(TymObject)
+  protected
+    FList: TList;
+    function GetCount: Integer;
+    function GetItems(Index: Integer): Pointer;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Clear; virtual;
+    procedure AddDirect(Item: TymObject);
+    procedure Add(Item: TymObject);
+    function Extract(var Item: TymObject): Boolean;
+    property Count: Integer read GetCount;
+    property Items[Index: Integer]: Pointer read GetItems; default;
+  end;
+
+  TymObjectList<T: TymObject> = class(TymObjectList)
+  public
+    destructor Destroy; override;
+    procedure Clear; override;
+    function Extract(var Item: T): Boolean;
   end;
 
   TymConnection = class(TymObject)
@@ -47,8 +82,8 @@ type
     function SendMethod(const Uri: String): TJSONObject;
   end;
 
-procedure _ReleaseNil(var Obj: TymObject);
-procedure _TerminateReleaseNil(var Obj: TymObject);
+procedure _ReleaseNil(var Obj);
+procedure _TerminateReleaseNil(var Obj);
 
 function _JSONString(Node: TJSONObject; const Name: String): String;
 function _JSONBool(Node: TJSONObject; const Name: String): Boolean;
@@ -107,17 +142,25 @@ end;
 
 {TymObject}
 
-procedure _ReleaseNil(var Obj: TymObject);
+procedure _ReleaseNil(var Obj);
+var
+  ObjTmp: TymObject;
 begin
-  Obj._Release;
-  Obj := nil;
+  Pointer(ObjTmp) := Pointer(Obj);
+  if not Assigned(ObjTmp) then exit;
+  Pointer(Obj) := nil;
+  ObjTmp._Release;
 end;
 
-procedure _TerminateReleaseNil(var Obj: TymObject);
+procedure _TerminateReleaseNil(var Obj);
+var
+  ObjTmp: TymObject;
 begin
-  Obj.Terminate;
-  Obj._Release;
-  Obj := nil;
+  Pointer(ObjTmp) := Pointer(Obj);
+  if not Assigned(ObjTmp) then exit;
+  Pointer(Obj) := nil;
+  ObjTmp.Terminate;
+  ObjTmp._Release;
 end;
 
 procedure TymObject.AfterConstruction;
@@ -131,6 +174,11 @@ begin
   if not Terminated then Terminate;
 end;
 
+procedure TymObject.DoTerminate;
+begin
+
+end;
+
 function TymObject.GetTerminated: Boolean;
 begin
   Result := FTerminated <> 0;
@@ -139,9 +187,10 @@ end;
 procedure TymObject.Terminate;
 begin
   AtomicExchange(FTerminated, 1);
+  DoTerminate;
 end;
 
-function TymObject._CopyRef: TymObject;
+function TymObject._CopyRef: Pointer;
 begin
   if FRefCount <= 0 then _RAISE_YM_OBJECT('Invalid Reference count');
   Result := self;
@@ -210,6 +259,105 @@ end;
 function TymObjectApi.SendMethod(const Uri: String): TJSONObject;
 begin
   Result := TJSONObject.ParseJSONValue(GET(Uri)) as TJSONObject;
+end;
+
+constructor TymObjectList.Create;
+begin
+  inherited Create;
+  FList := TList.Create();
+end;
+
+destructor TymObjectList.Destroy;
+begin
+  Clear;
+  FreeAndNil(FList);
+  inherited Destroy;
+end;
+
+procedure TymObjectList.Add(Item: TymObject);
+begin
+  FList.Add(Item);
+  Item._CopyRef;
+end;
+
+procedure TymObjectList.AddDirect(Item: TymObject);
+begin
+  FList.Add(Item);
+end;
+
+procedure TymObjectList.Clear;
+begin
+  FList.Clear;
+end;
+
+function TymObjectList.Extract(var Item: TymObject): Boolean;
+begin
+  Result := FList.Count > 0;
+  if not Result then exit;
+  Item := FList[0];
+  FList.Delete(0);
+end;
+
+function TymObjectList.GetCount: Integer;
+begin
+  Result := FList.Count;
+end;
+
+function TymObjectList.GetItems(Index: Integer): Pointer;
+begin
+  if (Index < 0) or (Index >= GetCount) then exit(nil);
+  Result := FList[Index];
+end;
+
+destructor TymObjectList<T>.Destroy;
+var
+  p: T;
+begin
+  //while FList.Extract(Pointer(p)) <> nil do
+  //{}p._Release;
+  inherited Destroy;
+end;
+
+procedure TymObjectList<T>.Clear;
+var
+  i: Integer;
+  Item: TymObject;
+begin
+  for i := 0 to FList.Count - 1 do
+  begin
+    Item := TymObject(FList[i]);
+    _ReleaseNil(Item);
+  end;
+end;
+
+function TymObjectList<T>.Extract(var Item: T): Boolean;
+begin
+  Result := inherited Extract(TymObject(Item));
+  //Result := Assigned(FList.Extract(Item));
+end;
+
+constructor TymObjectLocked.Create;
+begin
+  inherited Create;
+  InitializeCriticalSection(FRTLCS);
+end;
+
+destructor TymObjectLocked.Destroy;
+begin
+  DeleteCriticalSection(FRTLCS);
+  inherited Destroy;
+end;
+
+{TymObjectLocked}
+
+procedure TymObjectLocked.Lock;
+begin
+  EnterCriticalSection(FRTLCS);
+end;
+
+procedure TymObjectLocked.Unlock;
+begin
+  LeaveCriticalSection(FRTLCS);
 end;
 
 end.

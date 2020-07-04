@@ -97,12 +97,12 @@ begin
     WriteLn(' --> Success');
     Track.Save(Format('%s.mp3', [Track.Name]));
     Track._Release;
-    if i > 0 then break;
+    //if i > 0 then break;
   end;
   Playlist._Release;
 end;
 
 begin
-  RegisterTest(TApiTest.Suite);
+//  RegisterTest(TApiTest.Suite);
 
 end.

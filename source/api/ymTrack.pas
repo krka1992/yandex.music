@@ -44,6 +44,7 @@ type
     FTrackId: String;
     function FindHigherQualityMp3: PymDownloadInfoItem;
     function GetDownloadInfoItem(index: Integer): PymDownloadInfoItem;
+    procedure InternalLoad(Async: Boolean; InfoIndex: Integer = -1);
   protected
     procedure _DownloadInfo(const TrackId: String; DownloadInfo: PymDownloadInfo);
     function _GetMp3(const DirectUrl: String): TMemoryStream;
@@ -52,6 +53,7 @@ type
     destructor Destroy; override;
     function GetDirectUrlMp3(const Uri: String): String;
     procedure Load(InfoIndex: Integer = -1);
+    procedure LoadAsync(InfoIndex: Integer = -1);
     procedure Save(const Filename: String);
     property Data: TMemoryStream read FData;
     property Info: TymDownloadInfo read FInfo;
@@ -135,9 +137,7 @@ begin
   else Result := @FInfo.Data[index];
 end;
 
-{TymTrack}
-
-procedure TymTrack.Load(InfoIndex: Integer = -1);
+procedure TymTrack.InternalLoad(Async: Boolean; InfoIndex: Integer = -1);
 var
   DownloadInfo: PymDownloadInfoItem;
   DirectLink: String;
@@ -156,6 +156,20 @@ begin
     if not success then
       if Assigned(FData) then FData.Free;
   end;
+end;
+
+{TymTrack}
+
+procedure TymTrack.Load(InfoIndex: Integer = -1);
+begin
+  InternalLoad(false, InfoIndex);
+end;
+
+{TymTrack}
+
+procedure TymTrack.LoadAsync(InfoIndex: Integer = -1);
+begin
+  InternalLoad(false, InfoIndex);
 end;
 
 procedure TymTrack.Save(const Filename: String);
