@@ -31,6 +31,8 @@ type
     FAborted: Boolean;
     FNotifyList: TymHTTPClientNotifyList;
     FNotifyHandle: HWND;
+    FFail: Boolean;
+    FErrorMessage: String;
     procedure DataCompleteCallback(const ARes: IAsyncResult);
     procedure DataReceive(ALen: Int64; ACount: Int64);
     procedure ContextFinalize(Status: Integer; const Error: String; Response: IHTTPResponse);
@@ -41,9 +43,12 @@ type
     destructor Destroy; override;
     procedure Abort;
     function Wait(Timeout: Cardinal = INFINITE): Boolean;
+    function IsCompleted: Boolean;
+    function IsFail: Boolean;
     function IsDone: Boolean;
     property OnDataReceive: TymOnDataReceive read FOnDataReceive write FOnDataReceive;
     property OnContextFinalize: TymOnContextFinalize read FOnContextFinalize write FOnContextFinalize;
+    property ErrorMessage: String read FErrorMessage;
   end;
 
   TymHTTPClientAgent = class(TymObject)
@@ -108,6 +113,8 @@ type
       CallbackRecv: TymOnDataReceive = nil; CallbackFin: TymOnContextFinalize = nil): TymHTTPAsyncContext;
     function Get(const AURI: String; AContent: TStream; AHeaders: TNetHeaders = nil): IHTTPResponse; overload;
     function Get(const AURI: String; AHeaders: TNetHeaders = nil): string; overload;
+    function Post(const AURI, ASource: String; AContent: TStream; AHeaders: TNetHeaders = nil): IHTTPResponse; overload;
+    function Post(const AURI: String; const ASource: Tstringlist; AHeaders: TNetHeaders = nil): IHTTPResponse; overload;
     property HTTPClient: THTTPClient read FHTTPClient;
   end;
 
@@ -242,6 +249,16 @@ begin
   CheckNotifies;
 end;
 
+function TymHTTPClient.Post(const AURI: String; const ASource: Tstringlist; AHeaders: TNetHeaders = nil): IHTTPResponse;
+begin
+  Result := FHTTPClient.Post(AURI, ASource);
+end;
+
+function TymHTTPClient.Post(const AURI, ASource: String; AContent: TStream; AHeaders: TNetHeaders = nil): IHTTPResponse;
+begin
+  Result := FHTTPClient.Post(AURI, ASource, AContent);
+end;
+
 function TymHTTPClient.PostAsync(const AURI: String; AContent: TStream; ASource: TStream; const MimeType: String;
   AHeaders: TNetHeaders = nil; CallbackRecv: TymOnDataReceive = nil; CallbackFin: TymOnContextFinalize = nil): TymHTTPAsyncContext;
 var
@@ -342,9 +359,19 @@ begin
   Abort;
 end;
 
+function TymHTTPAsyncContext.IsCompleted: Boolean;
+begin
+  Result := FAsyncRes.IsCompleted;
+end;
+
 function TymHTTPAsyncContext.IsDone: Boolean;
 begin
   Result := FAsyncRes.IsCompleted or FAsyncRes.IsCancelled;
+end;
+
+function TymHTTPAsyncContext.IsFail: Boolean;
+begin
+  Result := FFail;
 end;
 
 function TymHTTPAsyncContext.Wait(Timeout: Cardinal = INFINITE): Boolean;

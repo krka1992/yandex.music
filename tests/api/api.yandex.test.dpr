@@ -6,7 +6,7 @@ program api.yandex.test;
 
 uses
   {$IFDEF CHECK_LEACKS}
-    fastmm4,
+  fastmm4,
   {$ENDIF }
   DUnitTestRunner,
   System.SysUtils,
@@ -19,12 +19,13 @@ uses
   ymUser in '..\..\source\api\ymUser.pas',
   ymFeed in '..\..\source\api\ymFeed.pas',
   ymHTTPClient in '..\..\source\ymHTTPClient.pas',
-  test.async.client.http in 'test.async.client.http.pas';
+  test.async.client.http in 'test.async.client.http.pas',
+  ymHTTPClientNotifies in '..\..\source\ymHTTPClientNotifies.pas',
+  ymApiCommon in '..\..\source\api\ymApiCommon.pas';
 
 begin
   ReportMemoryLeaksOnShutdown := true;
-  try
-    RunRegisteredTests;
+  try RunRegisteredTests;
   except
     on E: Exception do Writeln(E.ClassName, ': ', E.Message);
   end;

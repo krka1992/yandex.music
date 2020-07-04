@@ -2,7 +2,7 @@ unit ymPlaylist;
 
 interface
 
-uses ymFace, ymTrack, System.JSON, SysUtils;
+uses ymFace, ymTrack, System.JSON, SysUtils, ymApiCommon;
 
 type
   TTrackId = record

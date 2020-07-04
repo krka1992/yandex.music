@@ -2,7 +2,7 @@ unit ymUser;
 
 interface
 
-uses SysUtils, ymFace, ymFeed;
+uses SysUtils, ymFace, ymFeed, ymApiCommon;
 
 type
   TymUser = class(TymObject)

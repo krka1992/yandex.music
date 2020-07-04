@@ -3,7 +3,7 @@ unit test;
 interface
 
 uses sysutils, TestFramework, ymApi, ymPlaylist, ymTrack,
-  JSON;
+  JSON, ymFace;
 
 type
 
@@ -18,9 +18,14 @@ type
     procedure TestGetMp3;
   published
     procedure TestGetPlaylist;
+    procedure TestGetPlaylistAsync;
   end;
 
 implementation
+
+type
+  TTrackList = class(TymObjectList<TymTrack>)
+  end;
 
 function GetAccountInfo(var login, pass: String): Boolean;
 var
@@ -97,12 +102,63 @@ begin
     WriteLn(' --> Success');
     Track.Save(Format('%s.mp3', [Track.Name]));
     Track._Release;
-    //if i > 0 then break;
+    break;
   end;
   Playlist._Release;
 end;
 
+procedure TApiTest.TestGetPlaylistAsync;
+var
+  Playlist: TymPlaylist;
+  Track: TymTrack;
+  TrackStr: String;
+  i: Integer;
+  TrackList: TTrackList;
+  State: TymAsyncLoadState;
 begin
-//  RegisterTest(TApiTest.Suite);
+  WriteLn;
+  FApi.AsyncMode := true;
+  TrackList := TTrackList.Create;
+  Playlist := FApi.GetUserPlaylist('57477732');
+  try
+    WriteLn(Format('PlaylistID: %s. Track count: %d', ['57477732', Playlist.GetCount]));
+
+    for i := 0 to Playlist.GetCount - 1 do
+    begin
+      Track := Playlist.CreateTrack(i);
+      Track.Load();
+      TrackList.AddDirect(Track);
+      break;
+    end;
+
+    while TrackList.Count > 0 do
+    begin
+      for i := TrackList.Count - 1 downto 0 do
+      begin
+        Track := TrackList[i];
+        State := Track.LoadState;
+
+        if State = alsCompleted then
+        begin
+          Track.Save(Format('%s.mp3', [Track.Name]));
+          WriteLn(Format('Сохранен трэк: %s.mp3', [Track.Name]));
+        end;
+
+        if State in [alsCompleted, alsFail, alsNone] then
+        begin
+          _ReleaseNil(Track);
+          TrackList.Delete(i);
+        end;
+
+      end;
+    end;
+  finally
+    Playlist._Release;
+    TrackList._Release;
+  end;
+end;
+
+begin
+  RegisterTest(TApiTest.Suite);
 
 end.

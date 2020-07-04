@@ -41,11 +41,10 @@ var
   Request: IHTTPRequest;
 begin
   WriteLn;
-  WriteLn(Format('THREAD: %d', [GetCurrentThreadId]));
   Stream := TMemoryStream.Create;
   try
     Context := FClient.GetAsync(
-      {}'https://speedtest.selectel.ru/10MB',
+      {}'https://speedtest.selectel.ru/1MB',
       {}Stream,
       {}nil,
       {}nil,
@@ -67,11 +66,11 @@ var
   Res: String;
 begin
   Stream := TMemoryStream.Create;
-  try Response := FClient.Get('https://qna.habr.com/tags/firsttime', Stream);
+  try Response := FClient.Get('https://speedtest.selectel.ru/1MB', Stream);
   finally Stream.Free;
   end;
 
-  Res := FClient.Get('https://qna.habr.com/tags/firsttime');
+  Res := FClient.Get('https://speedtest.selectel.ru/1MB');
 end;
 
 initialization

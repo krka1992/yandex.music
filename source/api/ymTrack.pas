@@ -2,7 +2,7 @@ unit ymTrack;
 
 interface
 
-uses System.Classes, SysUtils, System.JSON, ymFace, oxmlcdom;
+uses System.Classes, SysUtils, System.JSON, ymFace, oxmlcdom, ymApiCommon, ymHTTPClient;
 
 type
 
@@ -35,28 +35,35 @@ type
     function Fill(Value: TJSONObject): Boolean;
   end;
 
+  TymAsyncLoadState = (alsNone, alsProcessed, alsCompleted, alsFail);
+
   TymTrack = class(TymObject)
   private
+    FAsyncContext: TymHTTPAsyncContext;
     FOwner: TymObjectApi;
     FData: TMemoryStream;
     FInfo: TymDownloadInfo;
     FName: String;
     FTrackId: String;
+    FLoadState: TymAsyncLoadState;
     function FindHigherQualityMp3: PymDownloadInfoItem;
     function GetDownloadInfoItem(index: Integer): PymDownloadInfoItem;
-    procedure InternalLoad(Async: Boolean; InfoIndex: Integer = -1);
+    function GetLoadState: TymAsyncLoadState;
   protected
     procedure _DownloadInfo(const TrackId: String; DownloadInfo: PymDownloadInfo);
     function _GetMp3(const DirectUrl: String): TMemoryStream;
+    function _GetMp3Async(const DirectUrl: String): TMemoryStream;
+    procedure InternalLoad(InfoIndex: Integer = -1);
+    procedure InternalLoadAsync(InfoIndex: Integer = -1);
   public
     constructor Create(Owner: TymObjectApi; const TrackId: String);
     destructor Destroy; override;
     function GetDirectUrlMp3(const Uri: String): String;
     procedure Load(InfoIndex: Integer = -1);
-    procedure LoadAsync(InfoIndex: Integer = -1);
     procedure Save(const Filename: String);
     property Data: TMemoryStream read FData;
     property Info: TymDownloadInfo read FInfo;
+    property LoadState: TymAsyncLoadState read GetLoadState;
     property Name: String read FName write FName;
   end;
 
@@ -73,6 +80,7 @@ end;
 destructor TymTrack.Destroy;
 begin
   if Assigned(FData) then FData.Free;
+  _ReleaseNil(FAsyncContext);
   inherited Destroy;
 end;
 
@@ -108,7 +116,7 @@ var
 
 begin
   {TODO: Убрать отсюда OXML. Мне нужно несколько параметров из тела. Можно самому распарсить}
-  FileDownloadInfoXML := FOwner.GET(Uri);
+  FileDownloadInfoXML := FOwner.SendGet(Uri);
 
   xml := TXMLDocument.Create;
   try
@@ -137,12 +145,23 @@ begin
   else Result := @FInfo.Data[index];
 end;
 
-procedure TymTrack.InternalLoad(Async: Boolean; InfoIndex: Integer = -1);
+function TymTrack.GetLoadState: TymAsyncLoadState;
+begin
+  if FLoadState <> alsProcessed then exit(FLoadState);
+
+  if FAsyncContext.IsCompleted then FLoadState := alsCompleted;
+  if FAsyncContext.IsFail then FLoadState := alsFail;
+
+  Result := FLoadState;
+end;
+
+procedure TymTrack.InternalLoad(InfoIndex: Integer);
 var
   DownloadInfo: PymDownloadInfoItem;
   DirectLink: String;
   success: Boolean;
 begin
+  if FOwner.GetAsyncMode then exit;
   if Assigned(FData) then exit;
   success := false;
   try
@@ -158,18 +177,40 @@ begin
   end;
 end;
 
-{TymTrack}
-
-procedure TymTrack.Load(InfoIndex: Integer = -1);
+procedure TymTrack.InternalLoadAsync(InfoIndex: Integer);
+var
+  DownloadInfo: PymDownloadInfoItem;
+  DirectLink: String;
+  success: Boolean;
 begin
-  InternalLoad(false, InfoIndex);
+  if not FOwner.GetAsyncMode then exit;
+  if FLoadState <> alsNone then exit;
+
+  FLoadState := alsProcessed;
+
+  if Assigned(FData) then exit;
+  success := false;
+  try
+    DownloadInfo := GetDownloadInfoItem(InfoIndex);
+    if not Assigned(DownloadInfo) then raise Exception.Create('Error Message');
+
+    DirectLink := GetDirectUrlMp3(DownloadInfo.DownloadInfoUrl);
+    FData := _GetMp3Async(DirectLink);
+    success := true;
+  finally
+    if not success then
+      if Assigned(FData) then FData.Free;
+  end;
 end;
 
 {TymTrack}
 
-procedure TymTrack.LoadAsync(InfoIndex: Integer = -1);
+procedure TymTrack.Load(InfoIndex: Integer = -1);
 begin
-  InternalLoad(false, InfoIndex);
+  case FOwner.GetAsyncMode of
+    true: InternalLoadAsync(InfoIndex);
+    false: InternalLoad(InfoIndex);
+  end;
 end;
 
 procedure TymTrack.Save(const Filename: String);
@@ -188,6 +229,13 @@ begin
     DownloadInfo.Fill(JSON);
   finally JSON.Free;
   end;
+end;
+
+function TymTrack._GetMp3Async(const DirectUrl: String): TMemoryStream;
+begin
+  _ReleaseNil(FAsyncContext);
+  Result := TMemoryStream.Create;
+  FAsyncContext := FOwner.SendGetAsync(DirectUrl, Result);
 end;
 
 function TymTrack._GetMp3(const DirectUrl: String): TMemoryStream;

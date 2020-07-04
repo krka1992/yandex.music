@@ -3,11 +3,13 @@ unit ymApi;
 interface
 
 uses SysUtils, idHTTP, System.classes, System.JSON, oxmlcdom,
-  {}ymFace, ymPlaylist, ymTrack, ymUser, ymFeed;
+  {}ymFace, ymPlaylist, ymTrack, ymUser, ymFeed, ymHTTPClient, System.Net.HTTPClient, ymApiCommon;
 
 type
   TymApi = class(TymObjectApi)
   private
+    FHTTPClient: TymHTTPClient;
+    FAsyncMode: Boolean;
     function GetAuthParams(const Username, Password: String): TStringList;
     function InternalAuth(const Username, Password: String): Boolean;
   protected
@@ -20,6 +22,9 @@ type
     function GetUserPlaylist(const PlaylistId: String): TymPlaylist;
     function GetUser: TymUser;
     function GetFeed: TymFeed;
+    function GetHTTPClient: TymHTTPClient; override;
+    function GetAsyncMode: Boolean; override;
+    property AsyncMode: Boolean write FAsyncMode;
   end;
 
 implementation
@@ -31,42 +36,13 @@ const
 constructor TymApi.Create;
 begin
   inherited Create;
+  FHTTPClient := TymHTTPClient.Create();
 end;
 
 destructor TymApi.Destroy;
 begin
+  _ReleaseNil(FHTTPClient);
   inherited Destroy;
-end;
-
-function TymApi.InternalAuth(const Username, Password: String): Boolean;
-var
-  param: TStringList;
-  Res: String;
-  JSON: TJSONObject;
-begin
-  if FAuthorized then exit(true);
-  Result := false;
-
-  JSON := nil;
-  param := GetAuthParams(Username, Password);
-  try
-    Res := POST('https://oauth.yandex.ru/token', param);
-    if Res = '' then raise Exception.Create('Error authentification');
-
-    JSON := TJSONObject.ParseJSONValue(Res, false, true) as TJSONObject;
-
-    FAccessToken.TokenType := JSON.Values['token_type'].Value;
-    FAccessToken.AccesToken := JSON.Values['access_token'].Value;
-    FAccessToken.Expires := JSON.Values['expires_in'].Value;
-    FAccessToken.Uid := JSON.Values['uid'].Value;
-
-    FAuthorized := true;
-    Result := true;
-  finally
-    param.Free;
-    if Assigned(JSON) then JSON.Free;
-  end;
-
 end;
 
 function TymApi.Auth(const Username, Password: String): Boolean;
@@ -86,6 +62,11 @@ begin
   {TODO: Сделать проверку истечения времени действия токена}
 end;
 
+function TymApi.GetAsyncMode: Boolean;
+begin
+  Result := FAsyncMode;
+end;
+
 function TymApi.GetAuthParams(const Username, Password: String): TStringList;
 begin
   Result := TStringList.Create;
@@ -101,6 +82,11 @@ begin
   Result := TymFeed.Create(self);
 end;
 
+function TymApi.GetHTTPClient: TymHTTPClient;
+begin
+  Result := FHTTPClient;
+end;
+
 function TymApi.GetUserPlaylist(const PlaylistId: String): TymPlaylist;
 begin
   Result := TymPlaylist.Create(self, PlaylistId);
@@ -114,6 +100,39 @@ end;
 function TymApi.GetUser: TymUser;
 begin
   Result := TymUser.Create(self);
+end;
+
+function TymApi.InternalAuth(const Username, Password: String): Boolean;
+var
+  Response: IHTTPResponse;
+  params: TStringList;
+  Res: String;
+  JSON: TJSONObject;
+begin
+  params := GetAuthParams(Username, Password);
+  try
+    Response := FHTTPClient.POST('https://oauth.yandex.ru/token', params);
+    if Response.StatusCode <> 200 then
+      {}raise Exception.CreateFmt('Неожиданный ответ от сервера [Код: %d] [Ответ: %s]', [Response.StatusCode, Response.StatusText]);
+
+    Res := Response.ContentAsString;
+    if Res = '' then
+      {}raise Exception.Create('Ошибка аутентификации. Сервер вернул пустое тело ответа');
+
+    JSON := TJSONObject.ParseJSONValue(Res, false, true) as TJSONObject;
+
+    FAccessToken.TokenType := JSON.Values['token_type'].Value;
+    FAccessToken.AccesToken := JSON.Values['access_token'].Value;
+    FAccessToken.Expires := JSON.Values['expires_in'].Value;
+    FAccessToken.Uid := JSON.Values['uid'].Value;
+
+    FAuthorized := true;
+    Result := true;
+  finally
+    Response := nil;
+    if Assigned(JSON) then JSON.Free;
+    params.Free;
+  end;
 end;
 
 end.

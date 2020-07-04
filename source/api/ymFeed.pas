@@ -2,7 +2,7 @@ unit ymFeed;
 
 interface
 
-uses SysUtils, ymFace, System.JSON;
+uses SysUtils, ymFace, System.JSON, ymApiCommon;
 
 type
   TymBlock = class(TymObject)

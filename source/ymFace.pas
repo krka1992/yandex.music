@@ -43,6 +43,7 @@ type
     procedure Clear; virtual;
     procedure AddDirect(Item: TymObject);
     procedure Add(Item: TymObject);
+    procedure Delete(Index: Integer);
     function Extract(var Item: TymObject): Boolean;
     property Count: Integer read GetCount;
     property Items[Index: Integer]: Pointer read GetItems; default;
@@ -53,33 +54,6 @@ type
     destructor Destroy; override;
     procedure Clear; override;
     function Extract(var Item: T): Boolean;
-  end;
-
-  TymConnection = class(TymObject)
-  private
-    FHTTP: TidHTTP;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    property HTTP: TidHTTP read FHTTP;
-  end;
-
-  TymToken = record
-    TokenType: String;
-    AccesToken: String;
-    Expires: String;
-    Uid: String;
-  end;
-
-  TymObjectApi = class(TymObject)
-  protected
-    FAccessToken: TymToken;
-    FAuthorized: Boolean;
-  public
-    function GET(const Uri: String): String;
-    function POST(const Uri: String; Params: TStringList): String;
-    function CreateConnection: TymConnection;
-    function SendMethod(const Uri: String): TJSONObject;
   end;
 
 procedure _ReleaseNil(var Obj);
@@ -206,61 +180,6 @@ begin
   Destroy;
 end;
 
-constructor TymConnection.Create;
-begin
-  inherited Create;
-  FHTTP := TidHTTP.Create();
-  FHTTP.HTTPOptions := FHTTP.HTTPOptions + [hoKeepOrigProtocol];
-  FHTTP.Request.Accept := 'application/json';
-  FHTTP.Request.Connection := 'Keep-Alive';
-  FHTTP.Request.AcceptLanguage := 'ru';
-  FHTTP.Request.CacheControl := 'no-cache';
-  //FHTTP.Request.AcceptEncoding := 'gzip, deflate';
-  {TODO: Сделать сжатие запроса и ответа}
-  FHTTP.Request.UserAgent := 'Windows 10';
-end;
-
-destructor TymConnection.Destroy;
-begin
-  FreeAndNil(FHTTP);
-  inherited Destroy;
-end;
-
-function TymObjectApi.CreateConnection: TymConnection;
-begin
-  Result := TymConnection.Create;
-  if FAuthorized then
-    {}with Result.HTTP.Request.CustomHeaders do
-      {}AddValue('Authorization', Format('OAuth %s', [FAccessToken.AccesToken]));
-end;
-
-function TymObjectApi.GET(const Uri: String): String;
-begin
-  with CreateConnection do
-  begin
-    try Result := HTTP.GET(Uri);
-    finally _Release;
-    end;
-  end;
-end;
-
-function TymObjectApi.POST(const Uri: String; Params: TStringList): String;
-begin
-  with CreateConnection do
-  begin
-    try
-      HTTP.Request.ContentType := 'application/x-www-form-urlencoded';
-      Result := HTTP.POST(Uri, Params);
-    finally _Release;
-    end;
-  end;
-end;
-
-function TymObjectApi.SendMethod(const Uri: String): TJSONObject;
-begin
-  Result := TJSONObject.ParseJSONValue(GET(Uri)) as TJSONObject;
-end;
-
 constructor TymObjectList.Create;
 begin
   inherited Create;
@@ -288,6 +207,11 @@ end;
 procedure TymObjectList.Clear;
 begin
   FList.Clear;
+end;
+
+procedure TymObjectList.Delete(Index: Integer);
+begin
+  FList.Delete(index);
 end;
 
 function TymObjectList.Extract(var Item: TymObject): Boolean;
